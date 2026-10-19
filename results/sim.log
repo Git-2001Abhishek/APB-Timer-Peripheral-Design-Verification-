@@ -12,21 +12,23 @@ VCD info: dumpfile results/apb_timer.vcd opened for output.
 [8660000] TEST 7: timeout every cycle - W1C cannot clear RIS
 [8900000] TEST 8: EN=0 freezes the counter
 [10040000] TEST 9: reset while running
-[10650000] TEST 10: 4000 random APB transactions
+[10650000] TEST 10: PRESC lowered below the running prescaler count
+[11360000] TEST 11: CTRL write in the same cycle as a one-shot timeout
+[11600000] TEST 12: 4000 random APB transactions
 --------------------------------------------------
 Functional coverage
-  periodic timeouts           : 650
-  one-shot timeouts           : 53
-  RIS W1C clears              : 167
-  timeout vs W1C collisions   : 6
-  LOAD write pre-empting tmo  : 7
+  periodic timeouts           : 416
+  one-shot timeouts           : 46
+  RIS W1C clears              : 171
+  timeout vs W1C collisions   : 4
+  LOAD write pre-empting tmo  : 4
   CTRL write vs one-shot stop : 1
   read errors / write errors  : 115 / 893
-  reads  CTRL LOAD VALUE PRESC RIS MIS ID : 280 269 255 265 275 289 274
-  writes CTRL LOAD VALUE PRESC RIS MIS ID : 340 268 269 281 316 261 244
+  reads  CTRL LOAD VALUE PRESC RIS MIS ID : 280 269 255 265 276 289 274
+  writes CTRL LOAD VALUE PRESC RIS MIS ID : 345 270 269 286 318 261 244
   coverage holes              : 0
 --------------------------------------------------
-cycles simulated: 21536
+cycles simulated: 21631
 TEST PASSED
 --------------------------------------------------
-tb/tb_apb_timer.sv:522: $finish called at 215355000 (1ps)
+tb/tb_apb_timer.sv:559: $finish called at 216305000 (1ps)

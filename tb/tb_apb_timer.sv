@@ -105,7 +105,7 @@ module tb_apb_timer;
             wload  = w_ok && a == A_LOAD;
             wpresc = w_ok && a == A_PRESC;
             wris   = w_ok && a == A_RIS;
-            stp    = m_en && (m_pcnt == m_presc);
+            stp    = m_en && (m_pcnt >= m_presc);
             tmo    = stp && (m_value == 0) && !wload;
 
             // counter
@@ -442,6 +442,41 @@ module tb_apb_timer;
         if (irq !== 1'b0) fail("irq after reset");
     endtask
 
+    task automatic test_presc_lowered();
+        int waited;
+        $display("[%0t] TEST 10: PRESC lowered below the running prescaler count", $time);
+        apb_write(A_PRESC, 1000);
+        apb_write(A_LOAD, 0);                          // timeout on the next step
+        apb_write(A_CTRL, EN | IE);
+        repeat (50) @(posedge pclk);                   // prescaler count is now ~50
+        apb_write(A_PRESC, 4);
+        // the prescaler must wrap right away, not run on to 65535
+        wait_irq(20, waited);
+        apb_write(A_CTRL, 0);
+        apb_write(A_RIS, 1);
+        apb_write(A_PRESC, 0);
+    endtask
+
+    // A CTRL write landing in the same cycle as a one-shot timeout: the
+    // software write must win (EN keeps the written value).
+    // Back-to-back BFM writes complete every 3 cycles, so with LOAD=0 and
+    // PRESC=2 the second CTRL write lands exactly on the first timeout.
+    task automatic test_ctrl_vs_oneshot();
+        int n0;
+        $display("[%0t] TEST 11: CTRL write in the same cycle as a one-shot timeout", $time);
+        apb_write(A_PRESC, 2);
+        apb_write(A_LOAD, 0);
+        n0 = cov_ctrl_vs_oneshot;
+        apb_write(A_CTRL, EN | MODE);
+        apb_write(A_CTRL, EN | MODE | IE);
+        if (cov_ctrl_vs_oneshot != n0 + 1)
+            fail("CTRL write did not coincide with the one-shot timeout");
+        expect_read(A_RIS, 1, "timeout recorded");
+        apb_write(A_CTRL, 0);
+        apb_write(A_RIS, 1);
+        apb_write(A_PRESC, 0);
+    endtask
+
     // =================================================================
     // Constrained-random traffic (checked by the model / scoreboard)
     // =================================================================
@@ -450,7 +485,7 @@ module tb_apb_timer;
         logic [31:0] d, rd;
         logic        e;
         int          r;
-        $display("[%0t] TEST 10: %0d random APB transactions", $time, n);
+        $display("[%0t] TEST 12: %0d random APB transactions", $time, n);
         repeat (n) begin
             r = $urandom_range(99);
             if (r < 6)       a = 12'h01C + 4 * $urandom_range(0, 1000);  // unmapped
@@ -458,7 +493,7 @@ module tb_apb_timer;
             else             a = 4 * $urandom_range(0, 6);               // mapped
             case ({a[11:2], 2'b00})
                 A_LOAD:  d = $urandom_range(0, 12);
-                A_PRESC: d = $urandom_range(0, 3) | ($urandom << 16);    // junk upper bits
+                A_PRESC: d = $urandom_range(0, 7) | ($urandom << 16);    // junk upper bits
                 A_CTRL:  d = $urandom;                                   // random EN/MODE/IE
                 default: d = $urandom;
             endcase
@@ -485,6 +520,8 @@ module tb_apb_timer;
         test_timeout_beats_clear();
         test_disable_freezes();
         test_reset_midrun();
+        test_presc_lowered();
+        test_ctrl_vs_oneshot();
         test_random(N_RANDOM);
 
         repeat (5) @(posedge pclk);

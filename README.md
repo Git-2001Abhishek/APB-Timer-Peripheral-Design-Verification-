@@ -59,6 +59,11 @@ Any other address, and any write to `VALUE`, `MIS` or `ID`, gets
   the counter. A step with `VALUE = 0` is a **timeout**.
 - Periodic timeout period: **`(LOAD + 1) × (PRESC + 1)` clock cycles**.
 - While `EN = 0`, `VALUE` holds its value and the prescaler is cleared.
+- Lowering `PRESC` below the prescaler's current count while running makes
+  it wrap on the next cycle; it does not run on to 2^16.
+- After a one-shot timeout `VALUE` is 0. Setting `EN` again without
+  rewriting `LOAD` therefore times out again after `PRESC + 1` cycles.
+  Write `LOAD` first to start a new full-length countdown.
 - Same-cycle priorities: a `LOAD` write beats counting (and suppresses that
   cycle's timeout), a timeout setting `RIS` beats a W1C clear, and a software
   `CTRL` write beats the one-shot auto-clear of `EN`.
@@ -107,43 +112,47 @@ void timer_isr(void) { TIMER->RIS = 1; /* ... */ }
 | 7 | Timeout vs W1C | with a timeout every cycle a W1C cannot clear `RIS` |
 | 8 | Disable | `EN = 0` freezes `VALUE`, re-enabling resumes counting |
 | 9 | Reset while running | everything returns to reset values |
-| 10 | Constrained random | 4000 APB transactions: random registers and data, small `LOAD` / `PRESC` so timeouts happen often, 8 % illegal / unaligned addresses, random idle gaps |
+| 10 | `PRESC` lowered mid-count | `PRESC` 1000 → 4 after 50 cycles: the timeout comes within 20 cycles, not after a 2^16 wrap |
+| 11 | `CTRL` write vs one-shot stop | a `CTRL` write timed to land exactly on a one-shot timeout: the software write wins |
+| 12 | Constrained random | 4000 APB transactions: random registers and data, small `LOAD` / `PRESC` so timeouts happen often, 8 % illegal / unaligned addresses, random idle gaps |
 
 ### Results
 
-[`results/sim.log`](results/sim.log): **TEST PASSED**, 21,536 cycles,
+[`results/sim.log`](results/sim.log): **TEST PASSED**, 21,631 cycles,
 zero scoreboard mismatches. Functional coverage, with no holes:
 
 ```text
-periodic timeouts           : 650
-one-shot timeouts           : 53
-RIS W1C clears              : 167
-timeout vs W1C collisions   : 6
-LOAD write pre-empting tmo  : 7
+periodic timeouts           : 416
+one-shot timeouts           : 46
+RIS W1C clears              : 171
+timeout vs W1C collisions   : 4
+LOAD write pre-empting tmo  : 4
 CTRL write vs one-shot stop : 1
 read errors / write errors  : 115 / 893
-reads  CTRL LOAD VALUE PRESC RIS MIS ID : 280 269 255 265 275 289 274
-writes CTRL LOAD VALUE PRESC RIS MIS ID : 340 268 269 281 316 261 244
+reads  CTRL LOAD VALUE PRESC RIS MIS ID : 280 269 255 265 276 289 274
+writes CTRL LOAD VALUE PRESC RIS MIS ID : 345 270 269 286 318 261 244
 coverage holes              : 0
 ```
 
 **Mutation testing** ([`scripts/mutate.py`](scripts/mutate.py),
 [`results/mutation.log`](results/mutation.log)). To show the testbench
 actually finds bugs, ten realistic bugs are injected into the RTL one at a
-time. **All 10 are detected**:
+time. **All 12 are detected**:
 
 | Injected bug | Errors reported |
 | --- | --- |
-| W1C clear beats timeout | 41 |
-| Periodic reload off by one | 7335 |
+| W1C clear beats timeout | 83 |
+| Periodic reload off by one | 6215 |
 | No `PSLVERR` on read-only write | 777 |
-| Prescaler not cleared when disabled | 1347 |
-| One-shot never stops | 12963 |
-| `irq` ignores `IE` | 5732 |
-| `LOAD` write does not restart prescaler | 5767 |
+| Prescaler not cleared when disabled | 2196 |
+| One-shot never stops | 12159 |
+| `irq` ignores `IE` | 5061 |
+| `LOAD` write does not restart prescaler | 4189 |
 | `PRESC` register only 8 bits | 2 |
-| `PADDR[1:0]` not ignored | 4660 |
-| `MIS` reads raw status | 84 |
+| `PADDR[1:0]` not ignored | 4761 |
+| Prescaler compare `==` instead of `>=` | 4718 |
+| One-shot stop beats `CTRL` write | 5 |
+| `MIS` reads raw status | 67 |
 
 Waveform: programming the timer over APB (`LOAD = 9`, `CTRL = EN|IE`),
 `VALUE` counting 9 → 0, a timeout every 10 cycles, and the interrupt
@@ -152,7 +161,7 @@ cleared by a W1C write to `RIS` (0x010):
 ![APB timer waveform](results/wave_periodic.png)
 
 Synthesis (Yosys, generic gates) - [`results/synth_stat.txt`](results/synth_stat.txt):
-679 cells and 100 flip-flops (3 `CTRL` + 32 `LOAD` + 32 `VALUE` + 16 `PRESC`
+734 cells and 100 flip-flops (3 `CTRL` + 32 `LOAD` + 32 `VALUE` + 16 `PRESC`
 + 16 prescaler count + 1 `RIS`), no latches.
 
 ## How to run
@@ -163,6 +172,7 @@ Requires Icarus Verilog 12+ and Python 3; Yosys is optional.
 make sim        # testbench -> results/sim.log, results/apb_timer.vcd
 make mutate     # mutation testing -> results/mutation.log
 make synth      # Yosys synthesis check
+make lint       # Verilator -Wall lint (clean)
 make wave       # GTKWave
 ```
 
@@ -177,6 +187,7 @@ vvp -n sim.vvp
 
 - SystemVerilog
 - Icarus Verilog
+- Verilator (lint)
 - Yosys
 - GTKWave / Python + matplotlib (waveform figure)
 

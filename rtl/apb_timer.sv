@@ -42,7 +42,9 @@ module apb_timer #(
     input  logic                  psel,
     input  logic                  penable,
     input  logic                  pwrite,
+    /* verilator lint_off UNUSEDSIGNAL */  // PADDR[1:0] intentionally ignored
     input  logic [ADDR_WIDTH-1:0] paddr,
+    /* verilator lint_on UNUSEDSIGNAL */
     input  logic [31:0]           pwdata,
     output logic [31:0]           prdata,
     output logic                  pready,
@@ -78,7 +80,7 @@ module apb_timer #(
     // APB decode (PREADY is always high: every access completes in the
     // ACCESS phase, so psel & penable marks the completing cycle)
     // ------------------------------------------------------------------
-    logic [ADDR_WIDTH-1:0] addr;
+    logic [ADDR_WIDTH-1:0] addr;   // word address (PADDR[1:0] ignored)
     logic access, wr, rd;
     logic rd_ok, wr_ok;
 
@@ -129,7 +131,10 @@ module apb_timer #(
     logic step;      // prescaler wraps this cycle
     logic timeout;   // counter expires this cycle
 
-    assign step    = ctrl_en & (presc_cnt == presc_q);
+    // '>=' rather than '==': if PRESC is lowered below the current count
+    // while running, the prescaler wraps on the next cycle instead of
+    // counting on to 2**16.
+    assign step    = ctrl_en & (presc_cnt >= presc_q);
     assign timeout = step & (value_q == '0) & ~wr_load;
 
     always_ff @(posedge pclk or negedge presetn) begin
