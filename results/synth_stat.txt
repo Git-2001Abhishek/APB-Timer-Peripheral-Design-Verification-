@@ -1,0 +1,27 @@
+
+3. Printing statistics.
+
+=== apb_timer ===
+
+        +----------Local Count, excluding submodules.
+        | 
+      484 wires
+      767 wire bits
+       25 public wires
+      201 public wire bits
+       11 ports
+       84 port bits
+      679 cells
+       80   $_ANDNOT_
+      225   $_AND_
+       84   $_DFFE_PN0P_
+       16   $_DFF_PN0_
+       30   $_MUX_
+       37   $_NAND_
+       35   $_NOR_
+        6   $_NOT_
+       12   $_ORNOT_
+       98   $_OR_
+       10   $_XNOR_
+       46   $_XOR_
+

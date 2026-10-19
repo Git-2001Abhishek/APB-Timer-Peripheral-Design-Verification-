@@ -1,0 +1,4 @@
+*.vvp
+*.vcd
+build/
+__pycache__/

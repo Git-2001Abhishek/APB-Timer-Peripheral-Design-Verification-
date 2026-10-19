@@ -1,0 +1,12 @@
+W1C clear beats timeout                  killed   TEST FAILED: 41 error(s)
+periodic reload off by one               killed   TEST FAILED: 7335 error(s)
+no PSLVERR on read-only write            killed   TEST FAILED: 777 error(s)
+prescaler not cleared when disabled      killed   TEST FAILED: 1347 error(s)
+one-shot never stops                     killed   TEST FAILED: 12963 error(s)
+irq ignores IE                           killed   TEST FAILED: 5732 error(s)
+LOAD write does not restart prescaler    killed   TEST FAILED: 5767 error(s)
+PRESC register only 8 bits               killed   TEST FAILED: 2 error(s)
+PADDR[1:0] not ignored                   killed   TEST FAILED: 4660 error(s)
+MIS reads raw status                     killed   TEST FAILED: 84 error(s)
+----------------------------------------------------------------------
+10 / 10 mutants killed

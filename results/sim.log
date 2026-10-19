@@ -1,0 +1,32 @@
+VCD info: dumpfile results/apb_timer.vcd opened for output.
+[0] TEST 1: reset values
+[240000] TEST 2: register read/write
+[630000] TEST 3: PSLVERR on unmapped / read-only accesses
+[930000] TEST 4: periodic mode / prescaler timing
+        LOAD=9 PRESC=0 -> period 10 cycles: ok
+        LOAD=4 PRESC=3 -> period 20 cycles: ok
+        LOAD=19 PRESC=1 -> period 40 cycles: ok
+        LOAD=2 PRESC=15 -> period 48 cycles: ok
+[6610000] TEST 5: one-shot mode
+[8100000] TEST 6: interrupt enable / masking / W1C
+[8660000] TEST 7: timeout every cycle - W1C cannot clear RIS
+[8900000] TEST 8: EN=0 freezes the counter
+[10040000] TEST 9: reset while running
+[10650000] TEST 10: 4000 random APB transactions
+--------------------------------------------------
+Functional coverage
+  periodic timeouts           : 650
+  one-shot timeouts           : 53
+  RIS W1C clears              : 167
+  timeout vs W1C collisions   : 6
+  LOAD write pre-empting tmo  : 7
+  CTRL write vs one-shot stop : 1
+  read errors / write errors  : 115 / 893
+  reads  CTRL LOAD VALUE PRESC RIS MIS ID : 280 269 255 265 275 289 274
+  writes CTRL LOAD VALUE PRESC RIS MIS ID : 340 268 269 281 316 261 244
+  coverage holes              : 0
+--------------------------------------------------
+cycles simulated: 21536
+TEST PASSED
+--------------------------------------------------
+tb/tb_apb_timer.sv:522: $finish called at 215355000 (1ps)
