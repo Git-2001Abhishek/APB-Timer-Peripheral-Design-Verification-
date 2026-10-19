@@ -1,0 +1,10 @@
+W1C clear beats timeout                    killed   proof status: FAIL
+periodic reload off by one                 killed   proof status: FAIL
+no PSLVERR on read-only write              killed   proof status: FAIL
+one-shot never stops                       killed   proof status: FAIL
+irq ignores IE                             killed   proof status: FAIL
+prescaler compare '==' instead of '>='     killed   proof status: UNKNOWN
+prdata driven outside read access          killed   proof status: FAIL
+----------------------------------------------------------------------
+7 / 7 mutants break the proof
+(FAIL = counterexample found; UNKNOWN = induction can no longer prove it)

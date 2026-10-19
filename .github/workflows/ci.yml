@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verification:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: YosysHQ/setup-oss-cad-suite@v3
+      - name: Lint (Verilator -Wall)
+        run: make lint
+      - name: Simulation
+        run: make sim
+      - name: Mutation testing (testbench)
+        run: make mutate
+      - name: Synthesis check (Yosys)
+        run: make synth
+
+  formal:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: YosysHQ/setup-oss-cad-suite@v3
+      - name: Unbounded proof + cover (SymbiYosys)
+        run: make formal
+      - name: Mutation testing (formal proof)
+        run: make formal-mutate

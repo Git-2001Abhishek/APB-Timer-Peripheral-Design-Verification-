@@ -2,3 +2,4 @@
 *.vcd
 build/
 __pycache__/
+formal/*_*/

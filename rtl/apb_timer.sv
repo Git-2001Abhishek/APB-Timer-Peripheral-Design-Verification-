@@ -189,4 +189,95 @@ module apb_timer #(
 
     assign irq = ris & ctrl_ie;
 
+    // ------------------------------------------------------------------
+    // Formal properties (SymbiYosys, see formal/apb_timer.sby).
+    // Assumptions describe a legal APB3 master; assertions describe the
+    // timer. Proven unbounded with k-induction.
+    // ------------------------------------------------------------------
+`ifdef FORMAL
+    logic f_past_valid = 1'b0;
+    always @(posedge pclk) f_past_valid <= 1'b1;
+
+    // every trace starts in reset
+    always @(*) if (!f_past_valid) assume (!presetn);
+
+    // ---- legal APB3 master (zero-wait-state slave) ----
+    always @(*) if (penable) assume (psel);
+    always @(posedge pclk) if (f_past_valid && $past(presetn) && presetn) begin
+        // ACCESS follows SETUP, with stable address / control / data
+        if (penable) assume ($past(psel && !penable));
+        if ($past(psel && !penable)) begin
+            assume (psel && penable);
+            assume (paddr  == $past(paddr));
+            assume (pwrite == $past(pwrite));
+            assume (pwdata == $past(pwdata));
+        end
+        // PREADY is always 1, so a transfer ends after one ACCESS cycle
+        if ($past(psel && penable)) assume (!penable);
+    end
+
+    // ---- interface assertions ----
+    // independent decode of the register map for the PSLVERR check
+    logic [ADDR_WIDTH-1:0] f_word;
+    logic f_readable, f_writable;
+    assign f_word     = paddr & ~{{(ADDR_WIDTH-2){1'b0}}, 2'b11};
+    assign f_writable = (f_word == 'h00) || (f_word == 'h04) || (f_word == 'h0C) || (f_word == 'h10);
+    assign f_readable = f_writable || (f_word == 'h08) || (f_word == 'h14) || (f_word == 'h18);
+
+    always @(*) begin
+        assert (pready);
+        if (psel && penable) assert (pslverr == (pwrite ? !f_writable : !f_readable));
+        if (!(psel && penable))           assert (!pslverr);
+        if (!(psel && penable && !pwrite)) assert (prdata == '0);
+        assert (irq == (ris && ctrl_ie));
+        assert (presc_q <= 16'hFFFF);
+    end
+
+    // ---- behaviour assertions ----
+    always @(posedge pclk) if (f_past_valid && $past(presetn) && presetn) begin
+        // RIS is set only by a timeout and cleared only by a W1C write
+        if (!$past(ris) && ris) assert ($past(timeout));
+        if ($past(ris) && !ris) assert ($past(wr_ris && pwdata[0]));
+        // ... and a timeout always wins over a simultaneous W1C clear
+        if ($past(timeout)) assert (ris);
+
+        // rejected writes (PSLVERR) change no register
+        if ($past(wr && !wr_ok)) begin
+            assert ({ctrl_en, ctrl_mode, ctrl_ie} == $past({ctrl_en, ctrl_mode, ctrl_ie})
+                    || $past(timeout && ctrl_mode));
+            assert (load_q  == $past(load_q));
+            assert (presc_q == $past(presc_q));
+        end
+
+        // a LOAD write loads VALUE and restarts the prescaler
+        if ($past(wr_load)) assert (value_q == $past(pwdata) && presc_cnt == '0);
+
+        // disabled: VALUE holds, prescaler cleared
+        if ($past(!ctrl_en && !wr_load)) assert (value_q == $past(value_q) && presc_cnt == '0);
+
+        // a counting step decrements VALUE by exactly one
+        if ($past(step && !wr_load && value_q != '0)) assert (value_q == $past(value_q) - 1'b1);
+
+        // no step: VALUE holds
+        if ($past(ctrl_en && !step && !wr_load)) assert (value_q == $past(value_q));
+
+        // timeout: periodic reloads, one-shot stops (unless software rewrote CTRL)
+        if ($past(timeout && !ctrl_mode)) assert (value_q == $past(load_q));
+        if ($past(timeout &&  ctrl_mode && !wr_ctrl)) assert (!ctrl_en && value_q == '0);
+
+        // the prescaler never runs past PRESC, except for the single cycle
+        // right after PRESC is lowered (it then wraps immediately)
+        if (!$past(wr_presc)) assert (presc_cnt <= presc_q);
+    end
+
+    // ---- reachability ----
+    always @(posedge pclk) if (presetn) begin
+        cover (timeout && !ctrl_mode);
+        cover (timeout &&  ctrl_mode);
+        cover (pslverr);
+        cover (irq);
+        cover (timeout && wr_ris && pwdata[0]);   // set/clear collision
+    end
+`endif
+
 endmodule
