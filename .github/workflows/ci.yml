@@ -4,6 +4,12 @@ on:
   push:
   pull_request:
 
+# Explicit bash so pipelines use pipefail (the implicit default shell does
+# not, which lets `make ... | tee` hide a failing make).
+defaults:
+  run:
+    shell: bash
+
 jobs:
   verification:
     runs-on: ubuntu-latest
